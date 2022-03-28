@@ -110,10 +110,8 @@ namespace HashTableIndexing
             {
                 var ntfsReader =
                     new NtfsReader(driveInfo, RetrieveMode.Minimal);
-                var nodes = ntfsReader.GetNodes(driveName);
-
-                Console.WriteLine(nodes.Count);
-                foreach (var node in nodes)
+                
+                foreach (var node in ntfsReader.EnumerateNodes(driveName))
                 {
                     Display.Message = "Indexing";
 
@@ -170,7 +168,6 @@ namespace HashTableIndexing
                     Display.TotalIndexed++;
                 }
 
-                nodes = null;
                 ntfsReader = null;
             }
             catch (Exception)
