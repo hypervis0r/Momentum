@@ -10,13 +10,13 @@ FileIndexer.IndexFiles();
 Display.watch.Stop();
 Display.NeedsDisplay = false;
 Thread.Sleep(200);
-//Console.WriteLine($"[!] Indexing Complete: {Display.watch.Elapsed.Hours.ToString("D2")}:{Display.watch.Elapsed.Minutes.ToString("D2")}:{Display.watch.Elapsed.Seconds.ToString("D2")}");
+Console.WriteLine($"[!] Indexing Complete: {Display.watch.Elapsed.Hours.ToString("D2")}:{Display.watch.Elapsed.Minutes.ToString("D2")}:{Display.watch.Elapsed.Seconds.ToString("D2")}");
 Console.WriteLine($"> Complete, Hit Enter to continue <");
 Console.ReadLine();
 
 return;
 
-Stopwatch stopwatch = Stopwatch.StartNew();
+/*Stopwatch stopwatch = Stopwatch.StartNew();
 Console.WriteLine("[-] Loading Index File:");
 var files = FileIndexer.LoadIndexesFromFile();
 stopwatch.Stop();
@@ -108,4 +108,4 @@ while (true)
 
     Console.CursorLeft = 0;
     Console.CursorTop = 0;
-}
+}*/

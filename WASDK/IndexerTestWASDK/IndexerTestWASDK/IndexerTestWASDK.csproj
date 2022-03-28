@@ -24,6 +24,8 @@
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.WinUI.UI.Animations" Version="7.1.2" />
+    <PackageReference Include="Meziantou.Framework.Win32.AccessToken" Version="2.0.2" />
+    <PackageReference Include="Michaelkc.NtfsReader" Version="0.0.3" />
     <PackageReference Include="Microsoft.AppCenter.Analytics" Version="4.5.0" />
     <PackageReference Include="Microsoft.AppCenter.Crashes" Version="4.5.0" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.0.1" />

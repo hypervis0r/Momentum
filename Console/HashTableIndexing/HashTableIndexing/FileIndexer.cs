@@ -5,6 +5,7 @@ using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using System.IO.Filesystem.Ntfs;
 
 namespace HashTableIndexing
 {
@@ -12,10 +13,12 @@ namespace HashTableIndexing
     {
         public static void IndexFiles()
         {
-            var dictionary = SearchDirectory("C:\\");
+            var dictionary = SearchDirectoryNtfs("C:\\");
             Display.Message = "Saving to File";
             Display.watch.Stop();
+
             Console.ReadLine();
+
             Display.watch.Reset();
             Display.watch.Start();
             SaveIndexesToFile(dictionary);
@@ -49,7 +52,6 @@ namespace HashTableIndexing
                             {
                                 dictionary.Add(f.Key, new List<IndexedFileInfo>(f.Value));
                             }
-                            Display.TotalIndexed++;
                         }
                     }
                 }
@@ -96,6 +98,91 @@ namespace HashTableIndexing
             return dictionary;
         }
 
+        private static Dictionary<string, List<IndexedFileInfo>> SearchDirectoryNtfs(string driveName)
+        {
+            Display.Message = "Searching dir";
+
+            var dictionary = new Dictionary<string, List<IndexedFileInfo>>();
+
+            var driveInfo = new DriveInfo(driveName);
+
+            try
+            {
+                var ntfsReader =
+                    new NtfsReader(driveInfo, RetrieveMode.Minimal);
+                var nodes = ntfsReader.GetNodes(driveName);
+
+                Console.WriteLine(nodes.Count);
+                foreach (var node in nodes)
+                {
+                    Display.Message = "Indexing";
+
+                    /* Node is a directory */
+                    if ((node.Attributes & Attributes.Directory) == Attributes.Directory)
+                    {
+                        string foldername = node.Name.ToLower();
+                        var flist = new List<IndexedFileInfo>();
+                        flist.Add(new IndexedFileInfo() { Icon = "&#xE8B7;", Path = node.FullName });
+                        if (dictionary.ContainsKey(foldername))
+                        {
+                            dictionary[foldername].Add(new IndexedFileInfo() { Icon = "&#xE8B7;", Path = node.FullName });
+                        }
+                        else
+                        {
+                            dictionary.Add(foldername, flist);
+                        }
+
+                        Display.IndexedFolders++;
+                    }
+                    /* Node is a file */
+                    else
+                    {
+                        string name = node.Name.ToLower();
+                        var list = new List<IndexedFileInfo>();
+                        list.Add(new IndexedFileInfo() { Icon = "&#xE8B7;", Path = node.FullName });
+                        if (dictionary.ContainsKey(name))
+                        {
+                            foreach (var s in list)
+                            {
+                                try
+                                {
+                                    dictionary[name].Add(s);
+                                }
+                                catch (Exception)
+                                {
+
+                                }
+                            }
+                        }
+                        else
+                        {
+                            try
+                            {
+                                dictionary.Add(name, new List<IndexedFileInfo>(list));
+                            }
+                            catch (Exception)
+                            {
+
+                            }
+                        }
+                    }
+
+                    Display.TotalIndexed++;
+                }
+
+                nodes = null;
+                ntfsReader = null;
+            }
+            catch (Exception)
+            {
+                Console.WriteLine("AAAAAAAAAAAAAAAAAAAAA YOU FUCKING UGLY BITCH");
+            }
+
+            GC.Collect();
+
+            return dictionary;
+        }
+
         private static void SaveIndexesToFile(Dictionary<string, List<IndexedFileInfo>> dictionary)
         {
             //using (var memoryStream = new MemoryStream())
@@ -112,7 +199,7 @@ namespace HashTableIndexing
 
             string text = JsonConvert.SerializeObject(dictionary, Formatting.Indented);
 
-            File.WriteAllText("C:\\Users\\jhset\\Desktop\\Index.json", text);
+            File.WriteAllText(".\\Index.json", text);
         }
 
         public static Dictionary<string, List<IndexedFileInfo>> LoadIndexesFromFile()
@@ -131,7 +218,7 @@ namespace HashTableIndexing
                 //    return (Dictionary<string, List<string>>)binaryFormatter.Deserialize(memoryStream);
                 //}
 
-                string text =File.ReadAllText("C:\\Users\\jhset\\Desktop\\Index.json");
+                string text =File.ReadAllText(".\\Index.json");
 
                 var obj = JsonConvert.DeserializeObject<Dictionary<string, List<IndexedFileInfo>>>(text);
                 return obj;

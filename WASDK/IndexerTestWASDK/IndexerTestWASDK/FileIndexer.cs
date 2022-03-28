@@ -11,6 +11,8 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 using Windows.Storage;
+using System.IO.Filesystem.Ntfs;
+using Meziantou.Framework.Win32;
 
 namespace IndexerTestWASDK
 {
@@ -56,10 +58,56 @@ namespace IndexerTestWASDK
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
 
+        public bool IsCurrentProcessAdmin()
+        {
+            using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+            var principal = new System.Security.Principal.WindowsPrincipal(identity);
+            return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+        }
+
+        public static bool IsUserAdministrator()
+        {
+            using var token = AccessToken.OpenCurrentProcessToken(TokenAccessLevels.Query);
+            if (!IsAdministrator(token) && token.GetElevationType() == TokenElevationType.Limited)
+            {
+                using var linkedToken = token.GetLinkedToken();
+                return IsAdministrator(linkedToken);
+            }
+
+            return false;
+
+            static bool IsAdministrator(AccessToken accessToken)
+            {
+                var adminSid = SecurityIdentifier.FromWellKnown(WellKnownSidType.WinBuiltinAdministratorsSid);
+                foreach (var group in accessToken.EnumerateGroups())
+                {
+                    if (group.Attributes.HasFlag(GroupSidAttributes.SE_GROUP_ENABLED) && group.Sid == adminSid)
+                        return true;
+                }
+
+                return false;
+            }
+        }
+
         public async void IndexFiles(object q)
         {
             DispatcherQueue queue = q as DispatcherQueue;
-            var dictionary = await SearchDirectory(queue, Name);
+            Dictionary<string, List<IndexedFileInfo>> dictionary = null;
+
+            /*
+                If the current process is elevated, we can use the
+                super cool and fast NTFS parsing method for indexing files,
+                otherwise use the slow and lame method.
+            */
+          /*  if (IsUserAdministrator())
+            {*/
+                dictionary = await SearchDirectoryNtfs(queue, Name);
+            /*}
+            else
+            {
+                dictionary = await SearchDirectory(queue, Name);
+            }*/
+
             foreach (var item in dictionary)
             {
                 bool x = Files.TryAdd(item.Key, item.Value);
@@ -171,7 +219,76 @@ namespace IndexerTestWASDK
             return dictionary;
         }
 
-        public static void SaveIndexesToFile()
+        private async Task<Dictionary<string, List<IndexedFileInfo>>> SearchDirectoryNtfs(DispatcherQueue queue, string driveName)
+        {
+            var dictionary = new Dictionary<string, List<IndexedFileInfo>>();
+
+            var driveInfo = new DriveInfo(driveName);
+
+            try
+            {
+                var ntfsReader =
+                    new NtfsReader(driveInfo, RetrieveMode.All);
+                foreach (var node in ntfsReader.GetNodes(driveInfo.Name))
+                {
+                    /* Node is a directory */
+                    if ((node.Attributes & Attributes.Directory) == Attributes.Directory)
+                    {
+                        string foldername = node.Name.ToLower();
+                        var flist = new List<IndexedFileInfo>();
+                        flist.Add(new IndexedFileInfo() { Name = foldername, Type = IconType.Folder, Path = node.FullName });
+                        if (dictionary.ContainsKey(foldername))
+                        {
+                            dictionary[foldername].Add(new IndexedFileInfo() { Name = foldername, Type = IconType.Folder, Path = node.FullName });
+                        }
+                        else
+                        {
+                            dictionary.Add(foldername, flist);
+                        }
+                    }
+                    /* Node is a file */
+                    else
+                    {
+                        string name = node.Name.ToLower();
+                        var list = new List<IndexedFileInfo>();
+                        list.Add(new IndexedFileInfo() { Name = name, Type = IconType.File, Path = node.FullName });
+                        if (dictionary.ContainsKey(name))
+                        {
+                            foreach (var s in list)
+                            {
+                                try
+                                {
+                                    dictionary[name].Add(s);
+                                }
+                                catch (Exception)
+                                {
+
+                                }
+                            }
+                        }
+                        else
+                        {
+                            try
+                            {
+                                dictionary.Add(name, new List<IndexedFileInfo>(list));
+                            }
+                            catch (Exception)
+                            {
+
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception) 
+            { 
+            
+            }
+
+            return dictionary;
+        }
+
+            public static void SaveIndexesToFile()
         {
             string path = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             string[] dirs = Directory.GetDirectories(path);
